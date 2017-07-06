@@ -53,14 +53,8 @@ OctonetData::~OctonetData(void)
 
 int64_t OctonetData::parseID(std::string id)
 {
-	int64_t nativeId;
-	size_t strip;
-	/* Strip colons from id */
-	while ((strip = id.find(":")) != std::string::npos)
-		id.erase(strip, 1);
-
-	std::stringstream ids(id);
-	ids >> nativeId;
+	std::hash<std::string> hash_fn;
+	int64_t nativeId = hash_fn(id);
 
 	return nativeId;
 }
@@ -171,6 +165,7 @@ bool OctonetData::loadEPG(void)
 
 	const Json::Value eventList = root["EventList"];
 	OctonetChannel *channel = NULL;
+	kodi->Log(LOG_ERROR, "Parse %d events", eventList.size());
 	for (unsigned int i = 0; i < eventList.size(); i++) {
 		const Json::Value event = eventList[i];
 		OctonetEpgEntry entry;
@@ -182,12 +177,19 @@ bool OctonetData::loadEPG(void)
 		std::string channelId = event["ID"].asString();
 		std::string epgId = channelId.substr(channelId.rfind(":") + 1);
 		channelId = channelId.substr(0, channelId.rfind(":"));
+		kodi->Log(LOG_ERROR, "Event for channelId '%s', epgId '%s'",
+				channelId.c_str(), epgId.c_str());
 
 		entry.channelId = parseID(channelId);
+		kodi->Log(LOG_ERROR, "Parsed channelId '%d'", entry.channelId);
 		entry.id = atoi(epgId.c_str());
 
-		if (channel == NULL || channel->nativeId != entry.channelId)
+		if (channel == NULL || channel->nativeId != entry.channelId) {
 			channel = findChannel(entry.channelId);
+			if (channel)
+				kodi->Log(LOG_ERROR, "Found channel '%s' for channelId '%d'",
+						channel->name.c_str(), entry.channelId);
+		}
 
 		if (channel == NULL) {
 			kodi->Log(LOG_ERROR, "EPG for unknown channel.");
